@@ -187,7 +187,7 @@ impl Application for Sorter {
 	}
 }
 
-#[derive(Debug, Clone, Eq, Hash)]
+#[derive(Debug, Clone)]
 struct Item {
 	description: String,
 	state: ItemState,
@@ -199,7 +199,7 @@ impl PartialEq for Item {
 	}
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone)]
 pub enum ItemState {
 	Idle,
 	Editing,
