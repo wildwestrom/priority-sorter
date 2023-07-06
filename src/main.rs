@@ -1,18 +1,22 @@
+mod item;
+
 use iced::{
-	alignment::{self, Alignment},
+	alignment::{self},
 	event::{self, Event},
 	keyboard::{self, KeyCode, Modifiers},
 	subscription,
-	theme::{self, Theme},
-	widget::{self, button, column, container, row, scrollable, text, text_input},
+	theme::Theme,
+	widget::{self, button, column, container, scrollable, text, text_input},
 	window, Application, Color, Command, Element, Length, Settings, Subscription,
 };
 use once_cell::sync::Lazy;
 
+use crate::item::{Item, Message as ItemMessage};
+
 static INPUT_ID: Lazy<text_input::Id> = Lazy::new(text_input::Id::unique);
 
 pub fn main() -> iced::Result {
-	Sorter::run(Settings {
+	TopLevel::run(Settings {
 		window: window::Settings {
 			size: (500, 800),
 			..window::Settings::default()
@@ -22,7 +26,7 @@ pub fn main() -> iced::Result {
 }
 
 #[derive(Debug)]
-struct Sorter {
+struct TopLevel {
 	state: State,
 }
 
@@ -41,18 +45,18 @@ enum Message {
 	ToggleFullscreen(window::Mode),
 }
 
-impl Application for Sorter {
+impl Application for TopLevel {
 	type Executor = iced::executor::Default;
 	type Flags = ();
 	type Message = Message;
 	type Theme = Theme;
 
-	fn new(_flags: ()) -> (Sorter, Command<Message>) {
+	fn new(_flags: ()) -> (TopLevel, Command<Message>) {
 		let state = State {
 			input_value: "".into(),
 			items: Vec::new(),
 		};
-		(Sorter { state }, Command::none())
+		(TopLevel { state }, Command::none())
 	}
 
 	fn title(&self) -> String {
@@ -184,101 +188,5 @@ impl Application for Sorter {
 			},
 			_ => None,
 		})
-	}
-}
-
-#[derive(Debug, Clone)]
-struct Item {
-	description: String,
-	state: ItemState,
-}
-
-impl PartialEq for Item {
-	fn eq(&self, other: &Self) -> bool {
-		self.description == other.description
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum ItemState {
-	Idle,
-	Editing,
-}
-
-impl Default for ItemState {
-	fn default() -> Self {
-		Self::Idle
-	}
-}
-
-#[derive(Debug, Clone)]
-pub enum ItemMessage {
-	Edit,
-	DescriptionEdited(String),
-	FinishEdition,
-	Delete,
-}
-
-impl Item {
-	fn text_input_id(i: &usize) -> text_input::Id {
-		text_input::Id::new(format!("item-{}", i))
-	}
-
-	fn new(description: String) -> Self {
-		Item {
-			description,
-			state: ItemState::Idle,
-		}
-	}
-
-	fn update(&mut self, message: ItemMessage) {
-		match message {
-			ItemMessage::Edit => {
-				self.state = ItemState::Editing;
-			},
-			ItemMessage::DescriptionEdited(new_description) => {
-				self.description = new_description;
-			},
-			ItemMessage::FinishEdition => {
-				if !self.description.is_empty() {
-					self.state = ItemState::Idle;
-				}
-			},
-			ItemMessage::Delete => {},
-		}
-	}
-
-	fn view(&self, i: usize) -> Element<ItemMessage> {
-		match &self.state {
-			ItemState::Idle => row![
-				text((i + 1).to_string()),
-				text(self.description.as_str()).width(Length::Fill),
-				button("Edit")
-					.on_press(ItemMessage::Edit)
-					.padding(10)
-					.style(theme::Button::Text),
-			]
-			.spacing(20)
-			.align_items(Alignment::Center)
-			.into(),
-			ItemState::Editing => {
-				let text_input = text_input("An item to prioritize...", &self.description)
-					.id(Self::text_input_id(&i))
-					.on_input(ItemMessage::DescriptionEdited)
-					.on_submit(ItemMessage::FinishEdition)
-					.padding(10);
-
-				row![
-					text_input,
-					button("Delete")
-						.on_press(ItemMessage::Delete)
-						.padding(10)
-						.style(theme::Button::Destructive)
-				]
-				.spacing(20)
-				.align_items(Alignment::Center)
-				.into()
-			},
-		}
 	}
 }
