@@ -6,8 +6,8 @@ description = "Helps you sort a list of items by priority."
 license = "GPL-3.0-or-later"
 readme = "README.md"
 repository = "TODO"
-keywords = ["AST"]
-categories = ["visualization", "text-editors"]
+keywords = ["priority", "gui", "sorter"]
+categories = ["productivity"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
