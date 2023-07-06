@@ -1,13 +1,13 @@
 mod item;
 
 use iced::{
-	alignment::{self},
+	alignment,
 	event::{self, Event},
 	keyboard::{self, KeyCode, Modifiers},
 	subscription,
 	theme::Theme,
-	widget::{self, button, column, container, scrollable, text, text_input},
-	window, Application, Color, Command, Element, Length, Settings, Subscription,
+	widget::{self, button, column, container, row, scrollable, text, text_input},
+	window, Alignment, Application, Color, Command, Element, Length, Settings, Subscription,
 };
 use once_cell::sync::Lazy;
 
@@ -16,7 +16,7 @@ use crate::item::{Item, Message as ItemMessage};
 static INPUT_ID: Lazy<text_input::Id> = Lazy::new(text_input::Id::unique);
 
 pub fn main() -> iced::Result {
-	TopLevel::run(Settings {
+	App::run(Settings {
 		window: window::Settings {
 			size: (500, 800),
 			..window::Settings::default()
@@ -26,9 +26,18 @@ pub fn main() -> iced::Result {
 }
 
 #[derive(Debug)]
-struct TopLevel {
+struct App {
 	state: State,
+	mode: AppMode,
 }
+
+#[derive(Debug)]
+enum AppMode {
+	List,
+	Choose,
+}
+
+type ItemsList = Vec<Item>;
 
 #[derive(Debug, Default)]
 struct State {
@@ -36,8 +45,19 @@ struct State {
 	items: Vec<Item>,
 }
 
+trait CanCompare {
+	fn can_compare(&self) -> bool;
+}
+
+impl CanCompare for ItemsList {
+	fn can_compare(&self) -> bool {
+		self.len() >= 2
+	}
+}
+
 #[derive(Debug, Clone)]
 enum Message {
+	ToggleView,
 	InputChanged(String),
 	CreateTask,
 	ItemMessage(usize, ItemMessage),
@@ -45,18 +65,24 @@ enum Message {
 	ToggleFullscreen(window::Mode),
 }
 
-impl Application for TopLevel {
+impl Application for App {
 	type Executor = iced::executor::Default;
 	type Flags = ();
 	type Message = Message;
 	type Theme = Theme;
 
-	fn new(_flags: ()) -> (TopLevel, Command<Message>) {
+	fn new(_flags: ()) -> (App, Command<Message>) {
 		let state = State {
 			input_value: "".into(),
 			items: Vec::new(),
 		};
-		(TopLevel { state }, Command::none())
+		(
+			App {
+				state,
+				mode: AppMode::List,
+			},
+			Command::none(),
+		)
 	}
 
 	fn title(&self) -> String {
@@ -113,6 +139,17 @@ impl Application for TopLevel {
 				}
 			},
 			Message::ToggleFullscreen(mode) => window::change_mode(mode),
+			Message::ToggleView => {
+				match self.mode {
+					AppMode::List => {
+						if self.state.items.can_compare() {
+							self.mode = AppMode::Choose
+						}
+					},
+					AppMode::Choose => self.mode = AppMode::List,
+				}
+				Command::none()
+			},
 		}
 	}
 
@@ -120,47 +157,83 @@ impl Application for TopLevel {
 		let input_value = &self.state.input_value;
 
 		let items = &self.state.items;
-		let title = text("Priorities")
-			.width(Length::Fill)
-			.size(100)
-			.style(Color::from([0.5, 0.5, 0.5]))
-			.horizontal_alignment(alignment::Horizontal::Center);
 
-		let input = text_input("What would you like to prioritize?", input_value)
-			.id(INPUT_ID.clone())
-			.on_input(Message::InputChanged)
-			.on_submit(Message::CreateTask)
-			.padding(15)
-			.size(30);
+		let make_container = |content| {
+			scrollable(
+				container(content)
+					.width(Length::Fill)
+					.padding(40)
+					.center_x(),
+			)
+		};
 
-		let items_list: Element<_> = column(
-			items
-				.iter()
-				.enumerate()
-				.map(|(i, item)| {
-					item.view(i)
-						.map(move |message| Message::ItemMessage(i, message))
-				})
-				.collect(),
-		)
-		.spacing(10)
-		.into();
+		match self.mode {
+			AppMode::List => {
+				let title = text("Priorities")
+					.width(Length::Fill)
+					.size(100)
+					.style(Color::from([0.5, 0.5, 0.5]))
+					.horizontal_alignment(alignment::Horizontal::Center);
 
-		let content = if self.state.items.len() > 1 {
-			column![title, input, button("Sort items?"), items_list]
-		} else {
-			column![title, input, items_list]
+				let input = text_input("What would you like to prioritize?", input_value)
+					.id(INPUT_ID.clone())
+					.on_input(Message::InputChanged)
+					.on_submit(Message::CreateTask)
+					.padding(15)
+					.size(30);
+
+				let items_list: Element<_> = column(
+					items
+						.iter()
+						.enumerate()
+						.map(|(i, item)| {
+							item.view(i)
+								.map(move |message| Message::ItemMessage(i, message))
+						})
+						.collect(),
+				)
+				.spacing(10)
+				.into();
+
+				let content = if self.state.items.can_compare() {
+					column![
+						title,
+						input,
+						button("Sort Items").on_press(Message::ToggleView),
+						items_list
+					]
+				} else {
+					column![title, input, items_list]
+				}
+				.spacing(20)
+				.max_width(800);
+
+				make_container(content).into()
+			},
+			AppMode::Choose => {
+				let prompt_text = text("Which one is higher priority?")
+					.width(Length::Fill)
+					.size(48)
+					.style(Color::from([0.5, 0.5, 0.5]))
+					.horizontal_alignment(alignment::Horizontal::Center);
+
+				let choices = container(
+					row![button("choice a"), button("choice b")]
+						.spacing(40)
+						.align_items(Alignment::Start)
+						.width(Length::Fill),
+				)
+				.center_x();
+
+				let content = column![prompt_text, choices]
+					.align_items(Alignment::Center)
+					.spacing(60)
+					.width(Length::Fill)
+					.max_width(800);
+
+				make_container(content).into()
+			},
 		}
-		.spacing(20)
-		.max_width(800);
-
-		scrollable(
-			container(content)
-				.width(Length::Fill)
-				.padding(40)
-				.center_x(),
-		)
-		.into()
 	}
 
 	fn subscription(&self) -> Subscription<Message> {

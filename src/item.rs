@@ -6,7 +6,7 @@ use iced::{
 
 #[derive(Debug, Clone)]
 pub struct Item {
-	description: String,
+	pub description: String,
 	state: State,
 }
 
