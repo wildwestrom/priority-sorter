@@ -4,10 +4,16 @@ use iced::{
 	Alignment, Element, Length,
 };
 
+pub type ItemsList = Vec<Item>;
 #[derive(Debug, Clone)]
 pub struct Item {
 	pub description: String,
 	state: State,
+}
+impl PartialEq for Item {
+	fn eq(&self, other: &Self) -> bool {
+		self.description == other.description
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -29,9 +35,9 @@ impl Item {
 		text_input::Id::new(format!("item-{}", i))
 	}
 
-	pub fn new(description: String) -> Self {
+	pub fn new(description: &str) -> Self {
 		Item {
-			description,
+			description: description.into(),
 			state: State::Idle,
 		}
 	}

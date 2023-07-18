@@ -3,3 +3,4 @@
 out.rs
 .direnv
 **/*.rustfmt
+.vscode
