@@ -44,15 +44,13 @@ pub enum Message {
 	ChooseRight,
 }
 
-pub const DEFAULT_ITEMS: [Item; 44] = [
-	Item::new("Integrity"),
-	Item::new("Authenticity"),
+pub const DEFAULT_ITEMS: [Item; 36] = [
+	Item::new("Authenticity/Integrity"),
 	Item::new("Wisdom"),
 	Item::new("Knowledge"),
 	Item::new("Courage"),
 	Item::new("Resilience"),
 	Item::new("Compassion"),
-	Item::new("Kindness"),
 	Item::new("Justice"),
 	Item::new("Fairness"),
 	Item::new("Respect"),
@@ -62,23 +60,18 @@ pub const DEFAULT_ITEMS: [Item; 44] = [
 	Item::new("Love"),
 	Item::new("Connection"),
 	Item::new("Growth"),
-	Item::new("Development"),
 	Item::new("Freedom"),
 	Item::new("Independence"),
 	Item::new("Peace"),
 	Item::new("Harmony"),
 	Item::new("Creativity"),
-	Item::new("Innovation"),
 	Item::new("Achievement"),
 	Item::new("Success"),
-	Item::new("Health"),
-	Item::new("Well-being"),
+	Item::new("Health/Well-being"),
 	Item::new("Security"),
 	Item::new("Stability"),
 	Item::new("Joy"),
-	Item::new("Happiness"),
 	Item::new("Passion"),
-	Item::new("Enthusiasm"),
 	Item::new("Discipline"),
 	Item::new("Focus"),
 	Item::new("Openness"),
@@ -88,7 +81,6 @@ pub const DEFAULT_ITEMS: [Item; 44] = [
 	Item::new("Leadership"),
 	Item::new("Influence"),
 	Item::new("Beauty"),
-	Item::new("Aesthetics"),
 ];
 
 pub fn init() -> (AppState, Task<Message>) {
@@ -283,7 +275,7 @@ fn choose_view(sorter_state: &'_ SortState<Item>) -> Element<'_, Message> {
 		match sorter_state {
 			SortState::Empty => "There is nothing to compare.",
 			SortState::Done { .. } => "Done comparing!",
-			SortState::Compare { .. } => "Which one is higer priority?",
+			SortState::Compare { .. } => "Which one is more important?",
 		},
 		48,
 	);
