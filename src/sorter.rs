@@ -223,7 +223,7 @@ mod tests {
 
 	#[test]
 	fn sorts_matches_ground_truth_medium_sizes() {
-		for &n in &[10, 16, 20, 32, 40] {
+		for &n in &[21, 34, 55, 89, 144, 377, 610, 987] {
 			let (comparisons, gt, out) = run_simulated_sort(n, 0x1234_5678_9ABC_DEF0);
 			println!(
 				"medium_sizes: n={}, comparisons={}, bound={}",
@@ -244,7 +244,7 @@ mod tests {
 
 	#[test]
 	fn sorts_matches_ground_truth_large_sizes() {
-		for &n in &[50, 100, 1000, 10_000, 100_000, 1_000_000] {
+		for &n in &[1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229] {
 			let (comparisons, gt, out) = run_simulated_sort(n, 0xBABABABABABABABA);
 			println!(
 				"large_sizes: n={}, comparisons={}, bound={}",
