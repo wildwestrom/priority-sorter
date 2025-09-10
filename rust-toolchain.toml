@@ -1,2 +1,7 @@
 [toolchain]
-channel = "nightly"
+channel = "stable" 
+components = [
+  "rust-src",
+  "rust-analyzer",
+  "rustfmt",
+]

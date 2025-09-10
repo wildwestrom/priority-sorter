@@ -1,13 +1,10 @@
 use iced::{
-	alignment,
 	event::{self, Event},
-	keyboard::{self, KeyCode, Modifiers},
-	subscription,
-	theme::Theme,
+	keyboard::{self, key::Named, Key, Modifiers},
 	widget::{
 		self, button, column, container, row, scrollable, text, text_input, Scrollable, Text,
 	},
-	window, Alignment, Application, Color, Command, Element, Length, Subscription,
+	window, Alignment, Element, Length, Subscription, Task,
 };
 use once_cell::sync::Lazy;
 
@@ -18,7 +15,7 @@ use crate::{
 
 static INPUT_ID: Lazy<text_input::Id> = Lazy::new(text_input::Id::unique);
 
-pub struct App {
+pub struct AppState {
 	state: State,
 	mode: AppMode,
 }
@@ -42,152 +39,150 @@ pub enum Message {
 	CreateItem,
 	ItemMessage(usize, ItemMessage),
 	TabPressed { shift: bool },
-	ToggleFullscreen(window::Mode),
+	ToggleFullscreen(window::Id, window::Mode),
 	ChooseItem(Box<Item>),
 }
 
-impl Application for App {
-	type Executor = iced::executor::Default;
-	type Flags = ();
-	type Message = Message;
-	type Theme = Theme;
+pub fn init() -> (AppState, Task<Message>) {
+	let items = vec![
+		Item::new("fuckballs"),
+		Item::new("fuckass"),
+		Item::new("fuckeroni"),
+		Item::new("shitballs"),
+		Item::new("fucknugget"),
+	];
+	let sorter = Sorter::<Item>::new();
+	let state = State {
+		input_value: "".into(),
+		items,
+		sorter,
+	};
+	(
+		AppState {
+			state,
+			mode: AppMode::List,
+		},
+		Task::none(),
+	)
+}
 
-	fn new(_flags: ()) -> (App, Command<Message>) {
-		let items = vec![
-			Item::new("fuckballs"),
-			Item::new("fuckass"),
-			Item::new("fuckeroni"),
-			Item::new("shitballs"),
-			Item::new("fucknugget"),
-		];
-		let sorter = Sorter::<Item>::new();
-		let state = State {
-			input_value: "".into(),
-			items,
-			sorter,
-		};
+pub fn title(_state: &AppState) -> String {
+	"Priority Sorter".into()
+}
+
+pub fn update(app: &mut AppState, message: Message) -> Task<Message> {
+	let state = &mut app.state;
+	let mode = &mut app.mode;
+	match message {
+		Message::InputChanged(value) => {
+			state.input_value = value;
+			Task::none()
+		},
+		Message::CreateItem => {
+			if !state.input_value.is_empty() {
+				state
+					.items
+					.insert(state.items.len(), Item::new(&state.input_value.clone()));
+				state.input_value.clear();
+			}
+
+			Task::none()
+		},
+		Message::ItemMessage(i, ItemMessage::Delete) => {
+			state.items.remove(i);
+
+			Task::none()
+		},
+		Message::ItemMessage(i, item_message) => {
+			if let Some(item) = state.items.get_mut(i) {
+				let should_focus = matches!(item_message, ItemMessage::Edit);
+
+				item.update(item_message);
+
+				if should_focus {
+					let id = Item::text_input_id(&i);
+					Task::batch(vec![
+						text_input::focus(id.clone()),
+						text_input::select_all(id),
+					])
+				} else {
+					Task::none()
+				}
+			} else {
+				Task::none()
+			}
+		},
+		Message::TabPressed { shift } => {
+			if shift {
+				widget::focus_previous()
+			} else {
+				widget::focus_next()
+			}
+		},
+		Message::ToggleFullscreen(id, mode) => window::change_mode(id, mode),
+		Message::ListView => {
+			state.sorter.finish_sorting(&mut state.items);
+			*mode = AppMode::List;
+			Task::none()
+		},
+		Message::SortItems => {
+			match state.sorter.start_sorting(state.items.clone()) {
+				Ok(_) => *mode = AppMode::Choose,
+				Err(_) => *mode = AppMode::List,
+			}
+			Task::none()
+		},
+		Message::ChooseItem(choice) => {
+			match &state.sorter.make_choice(*choice) {
+				Ok(_) => {},
+				Err(_) => {},
+			}
+			Task::none()
+		},
+	}
+}
+
+pub fn view(app: &'_ AppState) -> Element<'_, Message> {
+	let input_value = &app.state.input_value;
+	let items = &app.state.items;
+	let sort_state = &app.state.sorter.state;
+
+	match app.mode {
+		AppMode::List => list_view(items, input_value),
+		AppMode::Choose => choose_view(sort_state),
+	}
+}
+
+pub fn subscription(_app: &AppState) -> Subscription<Message> {
+	event::listen_with(|event, status, window| match (event, status) {
 		(
-			App {
-				state,
-				mode: AppMode::List,
-			},
-			Command::none(),
-		)
-	}
-
-	fn title(&self) -> String {
-		"Priority Sorter".into()
-	}
-
-	fn update(&mut self, message: Message) -> Command<Message> {
-		let state = &mut self.state;
-		let mode = &mut self.mode;
-		match message {
-			Message::InputChanged(value) => {
-				state.input_value = value;
-				Command::none()
-			},
-			Message::CreateItem => {
-				if !state.input_value.is_empty() {
-					state
-						.items
-						.insert(state.items.len(), Item::new(&state.input_value.clone()));
-					state.input_value.clear();
-				}
-
-				Command::none()
-			},
-			Message::ItemMessage(i, ItemMessage::Delete) => {
-				state.items.remove(i);
-
-				Command::none()
-			},
-			Message::ItemMessage(i, item_message) => {
-				if let Some(item) = state.items.get_mut(i) {
-					let should_focus = matches!(item_message, ItemMessage::Edit);
-
-					item.update(item_message);
-
-					if should_focus {
-						let id = Item::text_input_id(&i);
-						Command::batch(vec![
-							text_input::focus(id.clone()),
-							text_input::select_all(id),
-						])
-					} else {
-						Command::none()
-					}
-				} else {
-					Command::none()
-				}
-			},
-			Message::TabPressed { shift } => {
-				if shift {
-					widget::focus_previous()
-				} else {
-					widget::focus_next()
-				}
-			},
-			Message::ToggleFullscreen(mode) => window::change_mode(mode),
-			Message::ListView => {
-				self.state.sorter.finish_sorting(&mut self.state.items);
-				*mode = AppMode::List;
-				Command::none()
-			},
-			Message::SortItems => {
-				match state.sorter.start_sorting(state.items.clone()) {
-					Ok(_) => *mode = AppMode::Choose,
-					Err(_) => *mode = AppMode::List,
-				}
-				Command::none()
-			},
-			Message::ChooseItem(choice) => {
-				match &state.sorter.make_choice(*choice) {
-					Ok(_) => {},
-					Err(_) => {},
-				}
-				Command::none()
-			},
-		}
-	}
-
-	fn view(&self) -> Element<Message> {
-		let input_value = &self.state.input_value;
-		let items = &self.state.items;
-		let sort_state = &self.state.sorter.state;
-
-		match self.mode {
-			AppMode::List => list_view(items, input_value),
-			AppMode::Choose => choose_view(sort_state),
-		}
-	}
-
-	fn subscription(&self) -> Subscription<Message> {
-		subscription::events_with(|event, status| match (event, status) {
-			(
-				Event::Keyboard(keyboard::Event::KeyPressed {
-					key_code: keyboard::KeyCode::Tab,
-					modifiers,
-					..
-				}),
-				event::Status::Ignored,
-			) => Some(Message::TabPressed {
-				shift: modifiers.shift(),
+			Event::Keyboard(keyboard::Event::KeyPressed {
+				key: Key::Named(Named::Tab),
+				modifiers,
+				..
 			}),
-			(
-				Event::Keyboard(keyboard::Event::KeyPressed {
-					key_code,
-					modifiers: Modifiers::SHIFT,
-				}),
-				event::Status::Ignored,
-			) => match key_code {
-				KeyCode::Up => Some(Message::ToggleFullscreen(window::Mode::Fullscreen)),
-				KeyCode::Down => Some(Message::ToggleFullscreen(window::Mode::Windowed)),
-				_ => None,
+			event::Status::Ignored,
+		) => Some(Message::TabPressed {
+			shift: modifiers.shift(),
+		}),
+		(
+			Event::Keyboard(keyboard::Event::KeyPressed {
+				key,
+				modifiers: Modifiers::SHIFT,
+				..
+			}),
+			event::Status::Ignored,
+		) => match key {
+			Key::Named(Named::ArrowUp) => {
+				Some(Message::ToggleFullscreen(window, window::Mode::Fullscreen))
+			},
+			Key::Named(Named::ArrowDown) => {
+				Some(Message::ToggleFullscreen(window, window::Mode::Windowed))
 			},
 			_ => None,
-		})
-	}
+		},
+		_ => None,
+	})
 }
 
 fn make_container(content: Element<Message>) -> Scrollable<Message> {
@@ -195,19 +190,15 @@ fn make_container(content: Element<Message>) -> Scrollable<Message> {
 		container(content)
 			.width(Length::Fill)
 			.padding(40)
-			.center_x(),
+			.center_x(Length::Shrink),
 	)
 }
 
-fn title_text(title: &str, size: impl Into<iced_core::Pixels>) -> Text {
-	text(title)
-		.width(Length::Fill)
-		.size(size)
-		.style(Color::from([0.5, 0.5, 0.5]))
-		.horizontal_alignment(alignment::Horizontal::Center)
+fn title_text(title: &'_ str, size: impl Into<iced_core::Pixels>) -> Text<'_> {
+	text(title).width(Length::Fill).size(size)
 }
 
-fn list_view<'a>(items: &'a ItemsList, input_value: &str) -> Element<'a, Message> {
+fn list_view<'a>(items: &'a ItemsList, input_value: &'a str) -> Element<'a, Message> {
 	let title = title_text("Priorities", 100);
 
 	let input = text_input("What would you like to prioritize?", input_value)
@@ -217,16 +208,10 @@ fn list_view<'a>(items: &'a ItemsList, input_value: &str) -> Element<'a, Message
 		.padding(15)
 		.size(30);
 
-	let items_list = column(
-		items
-			.iter()
-			.enumerate()
-			.map(|(i, item)| {
-				item.view(i)
-					.map(move |message| Message::ItemMessage(i, message))
-			})
-			.collect(),
-	)
+	let items_list = column(items.iter().enumerate().map(|(i, item)| {
+		item.view(i)
+			.map(move |message| Message::ItemMessage(i, message))
+	}))
 	.spacing(10);
 
 	make_container(
@@ -248,7 +233,7 @@ fn list_view<'a>(items: &'a ItemsList, input_value: &str) -> Element<'a, Message
 	.into()
 }
 
-fn choose_view<'a>(sorter_state: &'a SortState<Item>) -> Element<'a, Message> {
+fn choose_view(sorter_state: &'_ SortState<Item>) -> Element<'_, Message> {
 	let prompt_text = title_text(
 		match sorter_state {
 			SortState::Empty => "There is nothing to compare.",
@@ -271,19 +256,19 @@ fn choose_view<'a>(sorter_state: &'a SortState<Item>) -> Element<'a, Message> {
 		},
 	}
 	.width(Length::Fill)
-	.center_x();
+	.center_x(Length::Shrink);
 
 	scrollable(
 		container(
 			column![prompt_text, prompt]
-				.align_items(Alignment::Center)
+				.align_x(Alignment::Center)
 				.spacing(60)
 				.width(Length::Fill)
 				.max_width(800),
 		)
 		.width(Length::Fill)
 		.padding(40)
-		.center_x(),
+		.center_x(Length::Shrink),
 	)
 	.into()
 }

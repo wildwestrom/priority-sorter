@@ -1,5 +1,4 @@
 use iced::{
-	theme,
 	widget::{button, row, text, text_input},
 	Alignment, Element, Length,
 };
@@ -59,7 +58,7 @@ impl Item {
 		}
 	}
 
-	pub fn view(&self, i: usize) -> Element<Message> {
+	pub fn view(&'_ self, i: usize) -> Element<'_, Message> {
 		match &self.state {
 			State::Idle => row![
 				text((i + 1).to_string()),
@@ -67,10 +66,10 @@ impl Item {
 				button("Edit")
 					.on_press(Message::Edit)
 					.padding(10)
-					.style(theme::Button::Text),
+					.style(iced::widget::button::text),
 			]
 			.spacing(20)
-			.align_items(Alignment::Center)
+			.align_y(Alignment::Center)
 			.into(),
 			State::Editing => {
 				let text_input = text_input("An item to prioritize...", &self.description)
@@ -84,10 +83,10 @@ impl Item {
 					button("Delete")
 						.on_press(Message::Delete)
 						.padding(10)
-						.style(theme::Button::Destructive)
+						.style(iced::widget::button::danger)
 				]
 				.spacing(20)
-				.align_items(Alignment::Center)
+				.align_y(Alignment::Center)
 				.into()
 			},
 		}

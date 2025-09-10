@@ -1,16 +1,15 @@
 mod app;
-mod sorter;
 mod item;
+mod sorter;
 
-use app::App;
-use iced::{window, Application, Settings};
+use iced::window;
 
 pub fn main() -> iced::Result {
-	App::run(Settings {
-		window: window::Settings {
-			size: (500, 800),
+	iced::application(app::title, app::update, app::view)
+		.subscription(app::subscription)
+		.window(window::Settings {
+			size: iced::Size::new(500.0, 800.0),
 			..window::Settings::default()
-		},
-		..Settings::default()
-	})
+		})
+		.run_with(app::init)
 }

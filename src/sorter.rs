@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use rand::random;
 
 pub enum SortState<T> {
 	Empty,
@@ -25,7 +24,9 @@ trait SwapRemoveRandom<T> {
 
 impl<T> SwapRemoveRandom<T> for Vec<T> {
 	fn random_index(&self) -> usize {
-		random::<usize>() % self.len()
+		use rand::Rng;
+		let mut rng = rand::rng();
+		rng.random_range(0..self.len())
 	}
 
 	fn swap_remove_random(&mut self) -> Result<T> {
