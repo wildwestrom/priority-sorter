@@ -134,3 +134,132 @@ impl<T: Clone> Sorter<T> {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	use rand::rngs::StdRng;
+	use rand::seq::SliceRandom;
+	use rand::SeedableRng;
+
+	fn expected_max_comparisons(n: usize) -> usize {
+		if n <= 1 {
+			return 0;
+		}
+		let mut total = 0;
+		for k in 1..n {
+			let x = k + 1;
+			let ceil_log2 = (usize::BITS as usize) - (x - 1).leading_zeros() as usize;
+			total += ceil_log2;
+		}
+		total
+	}
+
+	fn run_simulated_sort(n: usize, seed: u64) -> (usize, Vec<i32>, Vec<i32>) {
+		let mut rng = StdRng::seed_from_u64(seed);
+		let mut items: Vec<i32> = (0..n as i32).collect();
+		items.shuffle(&mut rng);
+
+		let ground_truth_desc: Vec<i32> = {
+			let mut v = items.clone();
+			v.sort_by(|a, b| b.cmp(a)); // descending, most important first
+			v
+		};
+
+		let mut sorter = Sorter::new();
+		sorter.start_sorting(items.clone()).unwrap();
+
+		let mut comparisons = 0;
+		loop {
+			match &sorter.state {
+				SortState::Empty => {
+					assert_eq!(n, 0);
+					break;
+				},
+				SortState::Done { .. } => break,
+				SortState::Compare {
+					unsorted,
+					sorted,
+					lo,
+					hi,
+				} => {
+					// Determine pivot and current x, then choose based on numeric order
+					let mid = (*lo + *hi) / 2;
+					let x = unsorted.last().expect("there is a current item").as_ref();
+					let y = &sorted[mid];
+					let choice = if x > y { Choice::Left } else { Choice::Right };
+					comparisons += 1;
+					sorter.make_choice(choice).unwrap();
+				},
+			}
+		}
+
+		let mut out = items.clone();
+		sorter.finish_sorting(&mut out);
+		(comparisons, ground_truth_desc, out)
+	}
+
+	#[test]
+	fn sorts_matches_ground_truth_small_sizes() {
+		for &n in &[0, 1, 2, 3, 5, 8, 13] {
+			let (comparisons, gt, out) = run_simulated_sort(n, 0xDEADBEEFCAFEBABE);
+			println!(
+				"small_sizes: n={}, comparisons={}, bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+			assert_eq!(out, gt, "n={}", n);
+			assert!(
+				comparisons <= expected_max_comparisons(n),
+				"n={}, comparisons={} > bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+		}
+	}
+
+	#[test]
+	fn sorts_matches_ground_truth_medium_sizes() {
+		for &n in &[10, 16, 20, 32, 40] {
+			let (comparisons, gt, out) = run_simulated_sort(n, 0x1234_5678_9ABC_DEF0);
+			println!(
+				"medium_sizes: n={}, comparisons={}, bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+			assert_eq!(out, gt, "n={}", n);
+			assert!(
+				comparisons <= expected_max_comparisons(n),
+				"n={}, comparisons={} > bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+		}
+	}
+
+	#[test]
+	fn sorts_matches_ground_truth_large_sizes() {
+		for &n in &[50, 100, 1000, 10_000, 100_000, 1_000_000] {
+			let (comparisons, gt, out) = run_simulated_sort(n, 0xBABABABABABABABA);
+			println!(
+				"large_sizes: n={}, comparisons={}, bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+			assert_eq!(out, gt, "n={}", n);
+			assert!(
+				comparisons <= expected_max_comparisons(n),
+				"n={}, comparisons={} > bound={}",
+				n,
+				comparisons,
+				expected_max_comparisons(n)
+			);
+		}
+	}
+}
