@@ -3,10 +3,12 @@ use iced::{
 	Alignment, Element, Length,
 };
 
+use std::borrow::Cow;
+
 pub type ItemsList = Vec<Item>;
 #[derive(Debug, Clone)]
 pub struct Item {
-	pub description: String,
+	pub description: Cow<'static, str>,
 	state: State,
 }
 impl PartialEq for Item {
@@ -34,9 +36,16 @@ impl Item {
 		text_input::Id::new(format!("item-{}", i))
 	}
 
-	pub fn new(description: &str) -> Self {
+	pub const fn new(description: &'static str) -> Self {
 		Item {
-			description: description.into(),
+			description: Cow::Borrowed(description),
+			state: State::Idle,
+		}
+	}
+
+	pub fn from_string(description: String) -> Self {
+		Item {
+			description: Cow::Owned(description),
 			state: State::Idle,
 		}
 	}
@@ -47,7 +56,7 @@ impl Item {
 				self.state = State::Editing;
 			},
 			Message::DescriptionEdited(new_description) => {
-				self.description = new_description;
+				self.description = new_description.into();
 			},
 			Message::FinishEdition => {
 				if !self.description.is_empty() {
@@ -62,7 +71,7 @@ impl Item {
 		match &self.state {
 			State::Idle => row![
 				text((i + 1).to_string()),
-				text(self.description.as_str()).width(Length::Fill),
+				text(self.description.as_ref()).width(Length::Fill),
 				button("Edit")
 					.on_press(Message::Edit)
 					.padding(10)
@@ -72,7 +81,7 @@ impl Item {
 			.align_y(Alignment::Center)
 			.into(),
 			State::Editing => {
-				let text_input = text_input("An item to prioritize...", &self.description)
+				let text_input = text_input("An item to prioritize...", self.description.as_ref())
 					.id(Self::text_input_id(&i))
 					.on_input(Message::DescriptionEdited)
 					.on_submit(Message::FinishEdition)

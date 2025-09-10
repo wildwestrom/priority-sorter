@@ -44,19 +44,55 @@ pub enum Message {
 	ChooseRight,
 }
 
+pub const DEFAULT_ITEMS: [Item; 44] = [
+	Item::new("Integrity"),
+	Item::new("Authenticity"),
+	Item::new("Wisdom"),
+	Item::new("Knowledge"),
+	Item::new("Courage"),
+	Item::new("Resilience"),
+	Item::new("Compassion"),
+	Item::new("Kindness"),
+	Item::new("Justice"),
+	Item::new("Fairness"),
+	Item::new("Respect"),
+	Item::new("Dignity"),
+	Item::new("Responsibility"),
+	Item::new("Accountability"),
+	Item::new("Love"),
+	Item::new("Connection"),
+	Item::new("Growth"),
+	Item::new("Development"),
+	Item::new("Freedom"),
+	Item::new("Independence"),
+	Item::new("Peace"),
+	Item::new("Harmony"),
+	Item::new("Creativity"),
+	Item::new("Innovation"),
+	Item::new("Achievement"),
+	Item::new("Success"),
+	Item::new("Health"),
+	Item::new("Well-being"),
+	Item::new("Security"),
+	Item::new("Stability"),
+	Item::new("Joy"),
+	Item::new("Happiness"),
+	Item::new("Passion"),
+	Item::new("Enthusiasm"),
+	Item::new("Discipline"),
+	Item::new("Focus"),
+	Item::new("Openness"),
+	Item::new("Curiosity"),
+	Item::new("Gratitude"),
+	Item::new("Humility"),
+	Item::new("Leadership"),
+	Item::new("Influence"),
+	Item::new("Beauty"),
+	Item::new("Aesthetics"),
+];
+
 pub fn init() -> (AppState, Task<Message>) {
-	let items = vec![
-		Item::new("10"),
-		Item::new("20"),
-		Item::new("30"),
-		Item::new("40"),
-		Item::new("50"),
-		Item::new("60"),
-		Item::new("70"),
-		Item::new("80"),
-		Item::new("90"),
-		Item::new("100"),
-	];
+	let items: ItemsList = DEFAULT_ITEMS.to_vec();
 	let sorter = Sorter::<Item>::new();
 	let state = State {
 		input_value: "".into(),
@@ -86,9 +122,10 @@ pub fn update(app: &mut AppState, message: Message) -> Task<Message> {
 		},
 		Message::CreateItem => {
 			if !state.input_value.is_empty() {
-				state
-					.items
-					.insert(state.items.len(), Item::new(&state.input_value.clone()));
+				state.items.insert(
+					state.items.len(),
+					Item::from_string(state.input_value.clone()),
+				);
 				state.input_value.clear();
 			}
 
@@ -267,9 +304,9 @@ fn choose_view(sorter_state: &'_ SortState<Item>) -> Element<'_, Message> {
 			let mid = (*lo + *hi) / 2;
 			let left_desc = unsorted
 				.last()
-				.map(|b| b.description.as_str())
+				.map(|b| b.description.as_ref())
 				.unwrap_or("");
-			let right_desc = sorted[mid].description.as_str();
+			let right_desc = sorted[mid].description.as_ref();
 			let left_btn = button(left_desc).on_press(Message::ChooseLeft);
 			let right_btn = button(right_desc).on_press(Message::ChooseRight);
 			container(row![left_btn, right_btn].spacing(40))
