@@ -10,7 +10,7 @@ use once_cell::sync::Lazy;
 
 use crate::{
 	item::{Item, ItemsList, Message as ItemMessage},
-	sorter::{SortState, Sorter},
+	sorter::{Choice, SortState, Sorter},
 };
 
 static INPUT_ID: Lazy<text_input::Id> = Lazy::new(text_input::Id::unique);
@@ -40,16 +40,22 @@ pub enum Message {
 	ItemMessage(usize, ItemMessage),
 	TabPressed { shift: bool },
 	ToggleFullscreen(window::Id, window::Mode),
-	ChooseItem(Box<Item>),
+	ChooseLeft,
+	ChooseRight,
 }
 
 pub fn init() -> (AppState, Task<Message>) {
 	let items = vec![
-		Item::new("fuckballs"),
-		Item::new("fuckass"),
-		Item::new("fuckeroni"),
-		Item::new("shitballs"),
-		Item::new("fucknugget"),
+		Item::new("10"),
+		Item::new("20"),
+		Item::new("30"),
+		Item::new("40"),
+		Item::new("50"),
+		Item::new("60"),
+		Item::new("70"),
+		Item::new("80"),
+		Item::new("90"),
+		Item::new("100"),
 	];
 	let sorter = Sorter::<Item>::new();
 	let state = State {
@@ -132,8 +138,15 @@ pub fn update(app: &mut AppState, message: Message) -> Task<Message> {
 			}
 			Task::none()
 		},
-		Message::ChooseItem(choice) => {
-			match &state.sorter.make_choice(*choice) {
+		Message::ChooseLeft => {
+			match &state.sorter.make_choice(Choice::Left) {
+				Ok(_) => {},
+				Err(_) => {},
+			}
+			Task::none()
+		},
+		Message::ChooseRight => {
+			match &state.sorter.make_choice(Choice::Right) {
 				Ok(_) => {},
 				Err(_) => {},
 			}
@@ -244,11 +257,21 @@ fn choose_view(sorter_state: &'_ SortState<Item>) -> Element<'_, Message> {
 	);
 
 	let prompt = match sorter_state {
-		SortState::Compare { left, right, .. } => {
-			let left_desc = left.description.as_str();
-			let right_desc = right.description.as_str();
-			let left_btn = button(left_desc).on_press(Message::ChooseItem(left.clone()));
-			let right_btn = button(right_desc).on_press(Message::ChooseItem(right.clone()));
+		SortState::Compare {
+			unsorted,
+			sorted,
+			lo,
+			hi,
+			..
+		} => {
+			let mid = (*lo + *hi) / 2;
+			let left_desc = unsorted
+				.last()
+				.map(|b| b.description.as_str())
+				.unwrap_or("");
+			let right_desc = sorted[mid].description.as_str();
+			let left_btn = button(left_desc).on_press(Message::ChooseLeft);
+			let right_btn = button(right_desc).on_press(Message::ChooseRight);
 			container(row![left_btn, right_btn].spacing(40))
 		},
 		SortState::Done { .. } | SortState::Empty => {

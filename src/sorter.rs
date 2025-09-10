@@ -3,10 +3,13 @@ use anyhow::{anyhow, Result};
 pub enum SortState<T> {
 	Empty,
 	Compare {
-		left: Box<T>,
-		right: Box<T>,
+		// Items not yet inserted. The current item is always `unsorted.last()`.
 		unsorted: Vec<Box<T>>,
+		// Current total order built so far (most important first)
 		sorted: Vec<T>,
+		// Binary search bounds into `sorted` for inserting `left`
+		lo: usize,
+		hi: usize,
 	},
 	Done {
 		sorted: Vec<T>,
@@ -17,87 +20,97 @@ pub struct Sorter<T> {
 	pub state: SortState<T>,
 }
 
-trait SwapRemoveRandom<T> {
-	fn random_index(&self) -> usize;
-	fn swap_remove_random(&mut self) -> Result<T>;
+#[derive(Debug, Clone, Copy)]
+pub enum Choice {
+	Left,
+	Right,
 }
 
-impl<T> SwapRemoveRandom<T> for Vec<T> {
-	fn random_index(&self) -> usize {
-		use rand::Rng;
-		let mut rng = rand::rng();
-		rng.random_range(0..self.len())
-	}
-
-	fn swap_remove_random(&mut self) -> Result<T> {
-		if self.len() > 0 {
-			Ok(self.swap_remove(self.random_index()))
-		} else {
-			Err(anyhow!("No more items to pick from"))
-		}
-	}
-}
-
-impl<T: Clone + std::cmp::PartialEq> Sorter<T> {
+impl<T: Clone> Sorter<T> {
 	pub fn new() -> Self {
 		let state = SortState::Empty;
 		Sorter { state }
 	}
 
 	pub fn start_sorting(&mut self, items: Vec<T>) -> Result<()> {
-		let mut unsorted: Vec<_> = items.into_iter().map(|i| Box::new(i)).collect();
-		let left = unsorted.swap_remove_random()?;
-		let right = unsorted.swap_remove_random()?;
-		Ok(self.state = SortState::Compare {
-			left,
-			right,
+		// If no items or a single item, we're done immediately
+		match items.len() {
+			0 => {
+				self.state = SortState::Empty;
+				return Ok(());
+			},
+			1 => {
+				self.state = SortState::Done { sorted: items };
+				return Ok(());
+			},
+			_ => {},
+		}
+
+		let mut iter = items.into_iter();
+		// Seed the order with the first item
+		let first = iter.next().unwrap();
+		let sorted: Vec<T> = vec![first];
+		// Remaining items to insert
+		let unsorted: Vec<Box<T>> = iter.map(|i| Box::new(i)).collect();
+
+		// Ensure there is a current item to insert at `unsorted.last()`
+		if unsorted.is_empty() {
+			return Err(anyhow!("Expected at least two items"));
+		}
+		let lo = 0usize;
+		let hi = sorted.len(); // at least 1
+
+		self.state = SortState::Compare {
 			unsorted,
-			sorted: vec![],
-		})
+			sorted,
+			lo,
+			hi,
+		};
+		Ok(())
 	}
 
-	pub fn make_choice(&mut self, choice: T) -> Result<()> {
+	pub fn make_choice(&mut self, choice: Choice) -> Result<()> {
 		match &mut self.state {
 			SortState::Compare {
-				left,
-				right,
 				unsorted,
 				sorted,
+				lo,
+				hi,
 			} => {
-				if choice == **left {
-					sorted.push(*left.clone());
-					sorted.push(*right.clone());
+				let mid = (*lo + *hi) / 2;
+				// If left was chosen, x > pivot -> search upper segment [lo, mid)
+				// Else pivot > x -> search lower segment (mid, hi]
+				if matches!(choice, Choice::Left) {
+					*hi = mid;
 				} else {
-					sorted.push(*right.clone());
-					sorted.push(*left.clone());
+					*lo = mid + 1;
 				}
-				match unsorted.swap_remove_random() {
-					Ok(new_left) => match unsorted.swap_remove_random() {
-						Ok(new_right) => {
-							self.state = SortState::Compare {
-								left: new_left,
-								right: new_right,
-								unsorted: unsorted.clone(),
-								sorted: sorted.clone(),
-							};
-						},
-						_ => {
-							let new_right = sorted.swap_remove(sorted.len() - 1);
-							self.state = SortState::Compare {
-								left: new_left,
-								right: new_right.into(),
-								unsorted: unsorted.clone(),
-								sorted: sorted.clone(),
-							}
-						},
-					},
-					_ => {
-						self.state = SortState::Done {
-							sorted: sorted.clone(),
-						};
-					},
-				};
-				Ok(())
+
+				if *lo < *hi {
+					return Ok(());
+				}
+
+				// Insert current item at position `lo` and move to next item (or finish)
+				let insert_pos = *lo;
+				let x = *unsorted
+					.last()
+					.expect("unsorted is non-empty when comparing")
+					.clone();
+				sorted.insert(insert_pos, x);
+
+				// Remove the item we just inserted from the pending stack
+				let _removed_current = unsorted.pop();
+				if unsorted.is_empty() {
+					let final_sorted = sorted.clone();
+					self.state = SortState::Done {
+						sorted: final_sorted,
+					};
+					Ok(())
+				} else {
+					*lo = 0;
+					*hi = sorted.len();
+					Ok(())
+				}
 			},
 			SortState::Empty | SortState::Done { .. } => Err(anyhow!("This should not happen")),
 		}
