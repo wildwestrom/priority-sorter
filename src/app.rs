@@ -169,24 +169,19 @@ pub fn update(app: &mut AppState, message: Message) -> Task<Message> {
 			Task::none()
 		},
 		Message::SortItems => {
-			match state.sorter.start_sorting(state.items.clone()) {
-				Ok(_) => *mode = AppMode::Choose,
-				Err(_) => *mode = AppMode::List,
-			}
+			state.sorter.start_sorting(state.items.clone());
+			*mode = match state.sorter.state {
+				SortState::Compare { .. } => AppMode::Choose,
+				_ => AppMode::List,
+			};
 			Task::none()
 		},
 		Message::ChooseLeft => {
-			match &state.sorter.make_choice(Choice::Left) {
-				Ok(_) => {},
-				Err(_) => {},
-			}
+			state.sorter.make_choice(Choice::Left);
 			Task::none()
 		},
 		Message::ChooseRight => {
-			match &state.sorter.make_choice(Choice::Right) {
-				Ok(_) => {},
-				Err(_) => {},
-			}
+			state.sorter.make_choice(Choice::Right);
 			Task::none()
 		},
 	}

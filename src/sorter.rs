@@ -1,5 +1,3 @@
-use anyhow::{anyhow, Result};
-
 pub enum SortState<T> {
 	Empty,
 	Compare {
@@ -32,32 +30,34 @@ impl<T: Clone> Sorter<T> {
 		Sorter { state }
 	}
 
-	pub fn start_sorting(&mut self, items: Vec<T>) -> Result<()> {
+	pub fn start_sorting(&mut self, items: Vec<T>) {
 		// If no items or a single item, we're done immediately
 		match items.len() {
 			0 => {
 				self.state = SortState::Empty;
-				return Ok(());
+				return;
 			},
 			1 => {
 				self.state = SortState::Done { sorted: items };
-				return Ok(());
+				return;
 			},
 			_ => {},
 		}
 
 		let mut iter = items.into_iter();
-		// Seed the order with the first item
-		let first = iter.next().unwrap();
-		let sorted: Vec<T> = vec![first];
+		// Seed the order with the first item (avoid unwrap)
+		let sorted: Vec<T> = match iter.next() {
+			Some(first) => vec![first],
+			None => {
+				self.state = SortState::Empty;
+				return;
+			},
+		};
 		// Remaining items to insert
 		let unsorted: Vec<Box<T>> = iter.map(|i| Box::new(i)).collect();
 
-		// Ensure there is a current item to insert at `unsorted.last()`
-		if unsorted.is_empty() {
-			return Err(anyhow!("Expected at least two items"));
-		}
-		let lo = 0usize;
+		// At this point there must be at least one item in `unsorted`.
+		let lo = 0;
 		let hi = sorted.len(); // at least 1
 
 		self.state = SortState::Compare {
@@ -66,10 +66,10 @@ impl<T: Clone> Sorter<T> {
 			lo,
 			hi,
 		};
-		Ok(())
+		()
 	}
 
-	pub fn make_choice(&mut self, choice: Choice) -> Result<()> {
+	pub fn make_choice(&mut self, choice: Choice) {
 		match &mut self.state {
 			SortState::Compare {
 				unsorted,
@@ -78,41 +78,55 @@ impl<T: Clone> Sorter<T> {
 				hi,
 			} => {
 				let mid = (*lo + *hi) / 2;
-				// If left was chosen, x > pivot -> search upper segment [lo, mid)
-				// Else pivot > x -> search lower segment (mid, hi]
-				if matches!(choice, Choice::Left) {
-					*hi = mid;
+				// Determine current item without expecting
+				let has_current = unsorted.last().is_some();
+				if has_current {
+					// If left was chosen, x > pivot -> search upper segment [lo, mid)
+					// Else pivot > x -> search lower segment (mid, hi]
+					if matches!(choice, Choice::Left) {
+						*hi = mid;
+					} else {
+						*lo = mid + 1;
+					}
 				} else {
-					*lo = mid + 1;
+					// No current item; finalize as Done
+					self.state = SortState::Done {
+						sorted: sorted.clone(),
+					};
+					return;
 				}
 
 				if *lo < *hi {
-					return Ok(());
+					return;
 				}
 
 				// Insert current item at position `lo` and move to next item (or finish)
 				let insert_pos = *lo;
-				let x = *unsorted
-					.last()
-					.expect("unsorted is non-empty when comparing")
-					.clone();
+				let x = match unsorted.pop() {
+					Some(b) => *b,
+					None => {
+						self.state = SortState::Done {
+							sorted: sorted.clone(),
+						};
+						return;
+					},
+				};
 				sorted.insert(insert_pos, x);
 
-				// Remove the item we just inserted from the pending stack
-				let _removed_current = unsorted.pop();
+				// If there are no more items, finish; else reset bounds
 				if unsorted.is_empty() {
 					let final_sorted = sorted.clone();
 					self.state = SortState::Done {
 						sorted: final_sorted,
 					};
-					Ok(())
+					()
 				} else {
 					*lo = 0;
 					*hi = sorted.len();
-					Ok(())
+					()
 				}
 			},
-			SortState::Empty | SortState::Done { .. } => Err(anyhow!("This should not happen")),
+			SortState::Empty | SortState::Done { .. } => (),
 		}
 	}
 
@@ -168,7 +182,7 @@ mod tests {
 		};
 
 		let mut sorter = Sorter::new();
-		sorter.start_sorting(items.clone()).unwrap();
+		sorter.start_sorting(items.clone());
 
 		let mut comparisons = 0;
 		loop {
@@ -190,7 +204,7 @@ mod tests {
 					let y = &sorted[mid];
 					let choice = if x > y { Choice::Left } else { Choice::Right };
 					comparisons += 1;
-					sorter.make_choice(choice).unwrap();
+					sorter.make_choice(choice);
 				},
 			}
 		}
@@ -244,7 +258,10 @@ mod tests {
 
 	#[test]
 	fn sorts_matches_ground_truth_large_sizes() {
-		for &n in &[1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811, 514229] {
+		for &n in &[
+			1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368, 75025, 121393, 196418, 317811,
+			514229,
+		] {
 			let (comparisons, gt, out) = run_simulated_sort(n, 0xBABABABABABABABA);
 			println!(
 				"large_sizes: n={}, comparisons={}, bound={}",
